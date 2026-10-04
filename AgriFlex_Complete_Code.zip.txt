@@ -1,0 +1,69 @@
+AGRIFLEX COMPLETE CODE - READY FOR GIT
+
+This file contains ALL code organized by folder. Copy each section into your git repo.
+
+═══════════════════════════════════════════════════════════════════════════════
+
+FRONTEND SETUP:
+cd frontend && npx create-react-app . && npm install axios react-router-dom recharts
+
+BACKEND SETUP:
+cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DOWNLOAD THESE FILES FROM /mnt/user-data/outputs/:
+
+FRONTEND CODE FILES:
+├── frontend_App.jsx → src/App.jsx
+├── frontend_index.jsx → src/index.jsx
+├── frontend_Home.jsx → src/pages/Home.jsx
+├── frontend_SetupPage.jsx → src/pages/SetupPage.jsx
+├── frontend_DashboardPage.jsx → src/pages/DashboardPage.jsx
+├── frontend_Dashboard.jsx → src/components/Dashboard.jsx
+├── frontend_Recommendation.jsx → src/components/Recommendation.jsx
+├── frontend_Optimizer.jsx → src/components/Optimizer.jsx
+├── frontend_DRInterface.jsx → src/components/DRInterface.jsx
+├── frontend_Analytics.jsx → src/components/Analytics.jsx
+├── frontend_api.js → src/services/api.js
+├── frontend_App.css → src/App.css
+├── frontend_index.css → src/styles/index.css
+├── frontend_Home.css → src/styles/Home.css
+├── frontend_SetupPage.css → src/styles/SetupPage.css
+├── frontend_Dashboard.css → src/styles/Dashboard.css
+├── frontend_Components.css → src/styles/Components.css
+├── package.json → frontend/package.json
+├── frontend.env → frontend/.env
+├── frontend.env.production → frontend/.env.production
+
+BACKEND CODE FILES:
+├── backend_main.py → backend/app/main.py
+├── backend_models.py → backend/app/models.py
+├── backend_database.py → backend/app/database.py
+├── backend_farms.py → backend/app/routes/farms.py
+├── backend_recommendations.py → backend/app/routes/recommendations.py
+├── backend_optimization.py → backend/app/routes/optimization.py
+├── backend_demand_response.py → backend/app/routes/demand_response.py
+├── backend_analytics.py → backend/app/routes/analytics.py
+├── backend_optimizer_engine.py → backend/app/services/optimizer_engine.py
+├── requirements.txt → backend/requirements.txt
+├── backend.env → backend/.env
+
+ROOT FILES:
+├── .gitignore
+├── README.md
+
+═══════════════════════════════════════════════════════════════════════════════
+
+TO DOWNLOAD ALL AT ONCE:
+Look in the outputs folder - each file is prefixed with its destination.
+
+TO SETUP:
+1. git clone <your-repo>
+2. cd AgriFlex
+3. Create folders: mkdir -p frontend/src/{pages,components,styles,services}
+4. Create folders: mkdir -p backend/app/{routes,services}
+5. Download each file above to correct location
+6. Rename files (remove prefix and extension)
+
+═══════════════════════════════════════════════════════════════════════════════

@@ -1,0 +1,158 @@
+================================================================================
+AGRIFLEX QUICK SETUP GUIDE
+================================================================================
+
+You have 3 files in /outputs/:
+1. ALL_FRONTEND_CODE.txt - Copy each section to correct file
+2. ALL_BACKEND_CODE.txt - Copy each section to correct file
+3. .gitignore, README.md - Root level files
+4. package.json, requirements.txt - Already done
+
+================================================================================
+STEP 1: CREATE PROJECT FOLDER (2 min)
+================================================================================
+
+mkdir AgriFlex
+cd AgriFlex
+git init
+git config user.name "Your Name"
+git config user.email "your@email.com"
+
+================================================================================
+STEP 2: CREATE FRONTEND (5 min)
+================================================================================
+
+mkdir -p frontend/src/{pages,components,styles,services}
+cd frontend
+
+# Copy ALL sections from ALL_FRONTEND_CODE.txt:
+# - For each FILE header, create that file with the code below it
+# Example: For "FILE: src/App.jsx", create frontend/src/App.jsx with that code
+
+# After copying all code files:
+npm create-react-app .
+npm install axios react-router-dom
+
+# Copy package.json from outputs
+
+cd ..
+
+================================================================================
+STEP 3: CREATE BACKEND (5 min)
+================================================================================
+
+mkdir -p backend/app/{routes,services}
+cd backend
+
+# Copy ALL sections from ALL_BACKEND_CODE.txt:
+# - For each FILE header, create that file with the code below it
+
+# Create virtual environment
+python -m venv venv
+
+# Activate it
+# Mac/Linux:
+source venv/bin/activate
+# Windows:
+# venv\Scripts\activate
+
+# Install packages
+pip install -r requirements.txt
+
+cd ..
+
+================================================================================
+STEP 4: TEST LOCALLY (10 min)
+================================================================================
+
+# Terminal 1 - Frontend:
+cd frontend
+npm start
+# Should see localhost:3000
+
+# Terminal 2 - Backend:
+cd backend
+python -m uvicorn app.main:app --reload
+# Should see http://localhost:8000
+
+# Test: Open http://localhost:3000
+# Click "Create Farm Setup" → Fill form → See dashboard with 5 tabs
+
+================================================================================
+STEP 5: UPLOAD TO GITHUB (5 min)
+================================================================================
+
+# From AgriFlex root:
+git add .
+git commit -m "Initial commit: AgriFlex frontend + backend"
+git remote add origin https://github.com/YOUR_USERNAME/AgriFlex.git
+git branch -M main
+git push -u origin main
+
+# Verify on GitHub.com - should see all files
+
+================================================================================
+STEP 6: DEPLOY FRONTEND (5 min)
+================================================================================
+
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+cd frontend
+vercel --prod
+
+# Get URL: https://agriflex-xxx.vercel.app
+# This is FRONTEND URL for judges
+
+================================================================================
+STEP 7: DEPLOY BACKEND (10 min)
+================================================================================
+
+Go to https://render.com
+1. Sign in with GitHub
+2. Click "New" → "Web Service"
+3. Select AgriFlex repository
+4. Configure:
+   - Name: agriflex-api
+   - Root Directory: backend
+   - Build Command: pip install -r requirements.txt
+   - Start Command: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+5. Click "Create Web Service"
+6. Wait 5-10 minutes
+7. Get URL: https://agriflex-api.onrender.com
+
+# This is BACKEND URL for judges
+
+================================================================================
+STEP 8: CONNECT THEM (2 min)
+================================================================================
+
+Update: frontend/.env.production
+
+REACT_APP_API_URL=https://agriflex-api.onrender.com/api
+
+Redeploy frontend:
+cd frontend
+vercel --prod
+
+================================================================================
+✅ YOU'RE DONE!
+================================================================================
+
+SHOW JUDGES:
+1. GitHub: https://github.com/YOUR_USERNAME/AgriFlex
+2. Frontend: https://agriflex-xxx.vercel.app
+3. Backend API: https://agriflex-api.onrender.com/docs
+4. Live demo: Try Optimizer tab with sliders
+
+SCRIPT (3 minutes):
+"40 million farmers, ₹3.3 trillion waste. This system:
+- Monitors farm energy in real-time
+- Recommends irrigation timing to save ₹4-5 daily
+- Lets farmers earn ₹1,500/year from demand response
+- Scales to 500k farmers = ₹1.99T national benefit"
+
+================================================================================
+TOTAL TIME: ~45 minutes from here
+================================================================================

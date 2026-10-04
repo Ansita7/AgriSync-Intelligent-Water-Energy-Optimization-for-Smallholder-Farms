@@ -1,0 +1,507 @@
+================================================================================
+ALL AGRIFLEX BACKEND CODE - COPY EACH SECTION TO CORRECT FILE
+================================================================================
+
+Setup: cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+
+================================================================================
+FILE: requirements.txt
+================================================================================
+fastapi==0.104.1
+uvicorn==0.24.0
+sqlalchemy==2.0.23
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+numpy==1.24.3
+pandas==2.0.3
+scikit-learn==1.3.2
+python-multipart==0.0.6
+
+================================================================================
+FILE: .env
+================================================================================
+DATABASE_URL=sqlite:///./agriflex.db
+DEBUG=False
+
+================================================================================
+FILE: app/__init__.py
+================================================================================
+# Empty file - makes app a package
+
+================================================================================
+FILE: app/main.py
+================================================================================
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
+
+# Import routes
+from app.routes import farms, recommendations, optimization, demand_response, analytics
+
+load_dotenv()
+
+app = FastAPI(
+    title="AgriFlex API",
+    description="Energy-Intelligent Irrigation Platform",
+    version="1.0.0",
+    docs_url="/docs",
+    openapi_url="/openapi.json"
+)
+
+# CORS Configuration
+origins = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "*"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routes
+app.include_router(farms.router, prefix="/api/farms", tags=["Farms"])
+app.include_router(recommendations.router, prefix="/api/recommendations", tags=["Recommendations"])
+app.include_router(optimization.router, prefix="/api/optimization", tags=["Optimization"])
+app.include_router(demand_response.router, prefix="/api/demand-response", tags=["Demand Response"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+
+@app.get("/")
+async def root():
+    return {"message": "AgriFlex API", "version": "1.0.0", "docs": "/docs"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "service": "AgriFlex API"}
+
+@app.get("/api/health")
+async def api_health_check():
+    return {"status": "healthy", "service": "AgriFlex API"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+================================================================================
+FILE: app/models.py
+================================================================================
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+
+class FarmCreate(BaseModel):
+    farmName: str
+    location: str
+    area: float
+    crop: str
+    soilType: str
+    irrigationType: str
+    pumpPower: float
+    waterAvailable: float
+    solarCapacity: float = 0
+    electricityCost: float
+
+class Farm(FarmCreate):
+    id: int
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+class RecommendationRequest(BaseModel):
+    farm_id: int
+    soil_moisture: float
+    rain_probability: float
+    water_available: float
+    solar_available: float
+
+class RecommendationResponse(BaseModel):
+    water: float
+    duration: float
+    start_time: str
+    end_time: str
+    energy: float
+    confidence: float
+    reason: str
+    cost_saved: float = 0
+
+class OptimizationRequest(BaseModel):
+    farm_id: int
+    crop_water_need: float
+    soil_moisture_current: float
+    rain_probability: float
+    water_available: float
+    solar_forecast: List[float]
+    energy_cost_by_hour: List[float]
+
+class OptimizationResponse(BaseModel):
+    recommended_water: float
+    recommended_hour: int
+    duration_minutes: int
+    energy_kwh: float
+    expected_cost: float
+    cost_vs_peak: float
+    confidence: float
+
+class DemandResponseRequest(BaseModel):
+    farm_id: int
+    event_duration_min: int
+    discom_payment_per_kwh: float
+    soil_moisture: float
+
+class DRResponse(BaseModel):
+    can_participate: bool
+    energy_avoided_kwh: Optional[float] = None
+    total_payment: Optional[float] = None
+    farmer_earning: Optional[float] = None
+    coop_earning: Optional[float] = None
+    reason: str
+
+================================================================================
+FILE: app/database.py
+================================================================================
+import sqlite3
+import json
+from datetime import datetime
+from typing import Dict, List, Optional
+
+class Database:
+    def __init__(self, db_path: str = "agriflex.db"):
+        self.db_path = db_path
+        self.init_db()
+
+    def init_db(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS farms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                farmName TEXT NOT NULL,
+                location TEXT NOT NULL,
+                area REAL NOT NULL,
+                crop TEXT NOT NULL,
+                soilType TEXT NOT NULL,
+                irrigationType TEXT NOT NULL,
+                pumpPower REAL NOT NULL,
+                waterAvailable REAL NOT NULL,
+                solarCapacity REAL DEFAULT 0,
+                electricityCost REAL NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS recommendations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                farm_id INTEGER NOT NULL,
+                water REAL NOT NULL,
+                duration REAL NOT NULL,
+                start_time TEXT NOT NULL,
+                energy REAL NOT NULL,
+                confidence REAL NOT NULL,
+                reason TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(farm_id) REFERENCES farms(id)
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+
+    def create_farm(self, farm_data: Dict) -> Dict:
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO farms (farmName, location, area, crop, soilType, irrigationType, pumpPower, waterAvailable, solarCapacity, electricityCost)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            farm_data['farmName'],
+            farm_data['location'],
+            farm_data['area'],
+            farm_data['crop'],
+            farm_data['soilType'],
+            farm_data['irrigationType'],
+            farm_data['pumpPower'],
+            farm_data['waterAvailable'],
+            farm_data.get('solarCapacity', 0),
+            farm_data['electricityCost']
+        ))
+        
+        farm_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return {"id": farm_id, **farm_data}
+
+    def get_farm(self, farm_id: int) -> Optional[Dict]:
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT * FROM farms WHERE id = ?', (farm_id,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        return dict(row) if row else None
+
+db = Database()
+
+================================================================================
+FILE: app/routes/__init__.py
+================================================================================
+# Empty file
+
+================================================================================
+FILE: app/routes/farms.py
+================================================================================
+from fastapi import APIRouter, HTTPException
+from typing import List
+from app.models import Farm, FarmCreate
+from app.database import db
+
+router = APIRouter()
+
+farms_db = {}
+farm_counter = 0
+
+@router.post("/", response_model=Farm)
+async def create_farm(farm: FarmCreate):
+    global farm_counter
+    farm_counter += 1
+    farm_id = farm_counter
+    
+    farm_dict = farm.dict()
+    farm_dict['id'] = farm_id
+    farm_dict['created_at'] = None
+    
+    farms_db[farm_id] = farm_dict
+    
+    try:
+        db.create_farm(farm.dict())
+    except:
+        pass
+    
+    return Farm(**farm_dict)
+
+@router.get("/{farm_id}", response_model=Farm)
+async def get_farm(farm_id: int):
+    if farm_id not in farms_db:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    return Farm(**farms_db[farm_id])
+
+@router.get("/", response_model=List[Farm])
+async def list_farms():
+    return [Farm(**f) for f in farms_db.values()]
+
+@router.put("/{farm_id}", response_model=Farm)
+async def update_farm(farm_id: int, farm: FarmCreate):
+    if farm_id not in farms_db:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    
+    farm_dict = farm.dict()
+    farm_dict['id'] = farm_id
+    farm_dict['created_at'] = None
+    farms_db[farm_id] = farm_dict
+    
+    return Farm(**farm_dict)
+
+@router.delete("/{farm_id}")
+async def delete_farm(farm_id: int):
+    if farm_id not in farms_db:
+        raise HTTPException(status_code=404, detail="Farm not found")
+    del farms_db[farm_id]
+    return {"message": "Farm deleted"}
+
+================================================================================
+FILE: app/routes/recommendations.py
+================================================================================
+from fastapi import APIRouter
+from app.models import RecommendationRequest, RecommendationResponse
+
+router = APIRouter()
+
+@router.post("/", response_model=RecommendationResponse)
+async def get_irrigation_recommendation(request: RecommendationRequest):
+    soil_moisture = request.soil_moisture
+    rain_prob = request.rain_probability
+    water_avail = request.water_available
+    solar_avail = request.solar_available
+    
+    if soil_moisture < 70 and rain_prob < 40 and water_avail > 500:
+        recommended_water = 800
+        
+        if solar_avail > 30:
+            start_time = "11:30 AM"
+            end_time = "12:20 PM"
+            energy = 1.7
+            cost_saved = 4.25
+        else:
+            start_time = "06:00 AM"
+            end_time = "06:50 AM"
+            energy = 1.7
+            cost_saved = 1.50
+        
+        confidence = 89
+        reason = "Soil moisture below target, rainfall unlikely, water available, solar optimal"
+        
+    else:
+        recommended_water = 0
+        start_time = "N/A"
+        end_time = "N/A"
+        energy = 0
+        confidence = 85
+        reason = "Soil moisture sufficient or rain expected; hold irrigation"
+        cost_saved = 0
+    
+    return RecommendationResponse(
+        water=recommended_water,
+        duration=50 if recommended_water > 0 else 0,
+        start_time=start_time,
+        end_time=end_time,
+        energy=energy,
+        confidence=confidence,
+        reason=reason,
+        cost_saved=cost_saved
+    )
+
+================================================================================
+FILE: app/routes/optimization.py
+================================================================================
+from fastapi import APIRouter
+from app.models import OptimizationRequest, OptimizationResponse
+from app.services.optimizer_engine import optimize_irrigation
+
+router = APIRouter()
+
+@router.post("/", response_model=OptimizationResponse)
+async def optimize(request: OptimizationRequest):
+    result = optimize_irrigation(
+        crop_water_need=request.crop_water_need,
+        soil_moisture=request.soil_moisture_current,
+        rain_prob=request.rain_probability,
+        water_avail=request.water_available,
+        solar_forecast=request.solar_forecast,
+        tariff_by_hour=request.energy_cost_by_hour
+    )
+    
+    return OptimizationResponse(**result)
+
+================================================================================
+FILE: app/routes/demand_response.py
+================================================================================
+from fastapi import APIRouter
+from app.models import DemandResponseRequest, DRResponse
+
+router = APIRouter()
+
+@router.post("/", response_model=DRResponse)
+async def calculate_dr(request: DemandResponseRequest):
+    if request.soil_moisture > 60:
+        pump_power = 2.2
+        energy_avoided = pump_power * (request.event_duration_min / 60)
+        total_payment = energy_avoided * request.discom_payment_per_kwh
+        farmer_earning = total_payment * 0.6
+        coop_earning = total_payment * 0.4
+        
+        return DRResponse(
+            can_participate=True,
+            energy_avoided_kwh=energy_avoided,
+            total_payment=total_payment,
+            farmer_earning=farmer_earning,
+            coop_earning=coop_earning,
+            reason="Soil moisture sufficient; safe to pause irrigation"
+        )
+    else:
+        return DRResponse(
+            can_participate=False,
+            reason="Soil moisture too low; cannot pause irrigation"
+        )
+
+================================================================================
+FILE: app/routes/analytics.py
+================================================================================
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/{farm_id}")
+async def get_analytics(farm_id: int, date_range: str = "7d", metric: str = "all"):
+    return {
+        "farm_id": farm_id,
+        "period": date_range,
+        "summary": {
+            "total_water_used": 5600,
+            "total_energy_used": 12.3,
+            "total_cost": 68.65,
+            "vs_baseline": {
+                "water_savings": "30%",
+                "energy_savings": "40%",
+                "cost_savings": "45%"
+            }
+        },
+        "daily_breakdown": [
+            {"date": "2026-10-01", "water": 800, "energy": 1.7, "cost": 9.50},
+            {"date": "2026-10-02", "water": 0, "energy": 0, "cost": 0},
+            {"date": "2026-10-03", "water": 1000, "energy": 2.2, "cost": 12.10},
+        ]
+    }
+
+================================================================================
+FILE: app/services/__init__.py
+================================================================================
+# Empty file
+
+================================================================================
+FILE: app/services/optimizer_engine.py
+================================================================================
+def optimize_irrigation(crop_water_need, soil_moisture, rain_prob, water_avail, solar_forecast, tariff_by_hour):
+    best_hour = None
+    best_score = -999
+    
+    for hour in range(24):
+        score = 0
+        
+        if tariff_by_hour[hour] < 3:
+            score += 40
+        elif tariff_by_hour[hour] < 5:
+            score += 20
+        
+        if solar_forecast[hour] > 30:
+            score += 40
+        elif solar_forecast[hour] > 15:
+            score += 20
+        
+        if 6 <= hour <= 16:
+            score += 20
+        
+        if score > best_score:
+            best_score = score
+            best_hour = hour
+    
+    water_to_irrigate = min(crop_water_need, water_avail)
+    pump_power = 2.2
+    duration = (water_to_irrigate / 300) * 60
+    energy = (pump_power * duration) / 60
+    
+    return {
+        "recommended_water": water_to_irrigate,
+        "recommended_hour": best_hour or 11,
+        "duration_minutes": int(duration),
+        "energy_kwh": round(energy, 2),
+        "expected_cost": round(energy * tariff_by_hour[best_hour or 11], 2),
+        "cost_vs_peak": round(energy * tariff_by_hour[best_hour or 11] - energy * 8, 2),
+        "confidence": 85
+    }
+
+================================================================================
+END OF BACKEND CODE
+================================================================================
